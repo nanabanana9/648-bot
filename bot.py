@@ -430,10 +430,11 @@ def _split_into_chunks(text: str, max_len: int = 480) -> list:
 async def translate_with_fallback(text: str, target_code: str) -> str:
     try:
         result = GoogleTranslator(source='auto', target=target_code).translate(text)
+        print(f"[translate-debug] GoogleTranslator returned: {result[:150]!r}" if result else "[translate-debug] GoogleTranslator returned empty/None")
         if result and not looks_like_translation_failure(result):
             return result
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[translate-debug] GoogleTranslator raised: {type(e).__name__}: {e}")
 
     # MyMemory's API hard-rejects anything over 500 characters — much
     # stricter than Google's practical limit. Rather than truncating (which
@@ -445,12 +446,13 @@ async def translate_with_fallback(text: str, target_code: str) -> str:
     try:
         for chunk in chunks:
             piece = MyMemoryTranslator(source='en-GB', target=mymemory_code).translate(chunk)
+            print(f"[translate-debug] MyMemory chunk ({len(chunk)} chars) -> {piece[:100]!r}" if piece else f"[translate-debug] MyMemory chunk ({len(chunk)} chars) -> empty/None")
             if not piece or looks_like_translation_failure(piece):
                 raise RuntimeError(f"chunk translation failed: {piece!r}")
             translated_chunks.append(piece)
         return "\n".join(translated_chunks)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[translate-debug] MyMemoryTranslator raised: {type(e).__name__}: {e}")
 
     raise RuntimeError("Both translation providers failed or returned an error page — try again shortly.")
 
@@ -470,13 +472,15 @@ class LanguageSelect(discord.ui.Select):
 
         translated_embeds = []
         failed = False
-        for original_text in self.original_texts:
+        for i, original_text in enumerate(self.original_texts):
             text_to_translate = original_text
             if len(text_to_translate) > 4500:
                 text_to_translate = text_to_translate[:4500] + "..."
             try:
                 oversatt = await translate_with_fallback(text_to_translate, code)
-            except Exception:
+                print(f"[translate-debug] embed #{i} translated OK ({len(oversatt)} chars)")
+            except Exception as e:
+                print(f"[translate-debug] embed #{i} FAILED: {type(e).__name__}: {e}")
                 failed = True
                 continue
             if len(oversatt) > 4096:
