@@ -430,17 +430,15 @@ def _split_into_chunks(text: str, max_len: int = 480) -> list:
 async def translate_with_fallback(text: str, target_code: str) -> str:
     try:
         result = GoogleTranslator(source='auto', target=target_code).translate(text)
-        print(f"[translate-debug] GoogleTranslator returned: {result[:200]!r}" if result else "[translate-debug] GoogleTranslator returned empty/None")
         if result and not looks_like_translation_failure(result):
             return result
-    except Exception as e:
-        print(f"[translate-debug] GoogleTranslator raised: {type(e).__name__}: {e}")
+    except Exception:
+        pass
 
-    # MyMemory's API hard-rejects anything over 500 characters (confirmed
-    # 2026-08-26 via a real NotValidLength error) — much stricter than
-    # Google's practical limit. Rather than truncating (which would cut off
-    # long content like a full 8-week schedule mid-sentence), split into
-    # multiple under-limit chunks, translate each, and rejoin.
+    # MyMemory's API hard-rejects anything over 500 characters — much
+    # stricter than Google's practical limit. Rather than truncating (which
+    # would cut off long content like a full 8-week schedule mid-sentence),
+    # split into multiple under-limit chunks, translate each, and rejoin.
     mymemory_code = MYMEMORY_CODE_MAP.get(target_code, target_code)
     chunks = _split_into_chunks(text)
     translated_chunks = []
@@ -450,17 +448,15 @@ async def translate_with_fallback(text: str, target_code: str) -> str:
             if not piece or looks_like_translation_failure(piece):
                 raise RuntimeError(f"chunk translation failed: {piece!r}")
             translated_chunks.append(piece)
-        result = "\n".join(translated_chunks)
-        print(f"[translate-debug] MyMemoryTranslator (chunked, {len(chunks)} pieces) returned: {result[:200]!r}")
-        return result
-    except Exception as e:
-        print(f"[translate-debug] MyMemoryTranslator raised: {type(e).__name__}: {e}")
+        return "\n".join(translated_chunks)
+    except Exception:
+        pass
 
     raise RuntimeError("Both translation providers failed or returned an error page — try again shortly.")
 
 class LanguageSelect(discord.ui.Select):
-    def __init__(self, original_text: str, original_author_name: str):
-        self.original_text = original_text
+    def __init__(self, original_texts: list, original_author_name: str):
+        self.original_texts = original_texts
         self.original_author_name = original_author_name
         options = [
             discord.SelectOption(label=SPRAK_NAVN.get(code, code), value=code, emoji=flagg)
@@ -470,49 +466,63 @@ class LanguageSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         code = self.values[0]
-        text_to_translate = self.original_text
-        if len(text_to_translate) > 4500:
-            text_to_translate = text_to_translate[:4500] + "..."
+        await interaction.response.edit_message(content="⏳ Translating...", embed=None, view=None)
 
-        try:
-            oversatt = await translate_with_fallback(text_to_translate, code)
-        except Exception as e:
-            await interaction.response.send_message(f"⚠️ Translation service is temporarily unavailable: {e}", ephemeral=True)
+        translated_embeds = []
+        failed = False
+        for original_text in self.original_texts:
+            text_to_translate = original_text
+            if len(text_to_translate) > 4500:
+                text_to_translate = text_to_translate[:4500] + "..."
+            try:
+                oversatt = await translate_with_fallback(text_to_translate, code)
+            except Exception:
+                failed = True
+                continue
+            if len(oversatt) > 4096:
+                oversatt = oversatt[:4093] + "..."
+            translated_embeds.append(discord.Embed(description=oversatt, color=discord.Color.blurple()))
+
+        if not translated_embeds:
+            await interaction.edit_original_response(content="⚠️ Translation service is temporarily unavailable — try again shortly.", embed=None)
             return
 
-        if len(oversatt) > 4096:
-            oversatt = oversatt[:4093] + "..."
-
-        embed = discord.Embed(description=oversatt, color=discord.Color.blurple())
-        embed.set_footer(text=f"Translated to {SPRAK_NAVN.get(code, code)} • original by {self.original_author_name}")
-        await interaction.response.edit_message(content=None, embed=embed, view=None)
+        translated_embeds[-1].set_footer(text=f"Translated to {SPRAK_NAVN.get(code, code)} • original by {self.original_author_name}" + (" (some parts failed)" if failed else ""))
+        # Discord allows up to 10 embeds per message; this covers every
+        # realistic case here (max 5 alliances at once via !fullseason all).
+        await interaction.edit_original_response(content=None, embeds=translated_embeds[:10])
 
 class LanguageSelectView(discord.ui.View):
-    def __init__(self, original_text: str, original_author_name: str):
+    def __init__(self, original_texts: list, original_author_name: str):
         super().__init__(timeout=120)
-        self.add_item(LanguageSelect(original_text, original_author_name))
+        self.add_item(LanguageSelect(original_texts, original_author_name))
 
-def get_translatable_text(message) -> str:
+def get_translatable_texts(message) -> list:
+    """
+    Returns a list of translatable text blocks — one per embed if the message
+    has embeds (e.g. !fullseason with no argument sends all 5 alliances as
+    separate embeds in one message), or a single-item list for plain content.
+    Returning one block per embed (rather than concatenating them all, or
+    only using the first) means every alliance gets translated, not just one.
+    """
     if message.content and message.content.strip():
-        return message.content
-    if not message.embeds:
-        return ""
-    # Only the FIRST embed — a message can carry several (e.g. !fullseason
-    # with no argument sends all 5 alliances as separate embeds in one
-    # message), and concatenating all of them produces text far too long to
-    # translate usefully (MyMemory hard-caps at 500 chars) or coherently.
-    embed = message.embeds[0]
-    parts = []
-    if embed.title:
-        parts.append(str(embed.title))
-    if embed.description:
-        parts.append(str(embed.description))
-    for field in embed.fields:
-        if field.name:
-            parts.append(str(field.name))
-        if field.value:
-            parts.append(str(field.value))
-    return "\n".join(parts)
+        return [message.content]
+    texts = []
+    for embed in message.embeds:
+        parts = []
+        if embed.title:
+            parts.append(str(embed.title))
+        if embed.description:
+            parts.append(str(embed.description))
+        for field in embed.fields:
+            if field.name:
+                parts.append(str(field.name))
+            if field.value:
+                parts.append(str(field.value))
+        text = "\n".join(parts)
+        if text:
+            texts.append(text)
+    return texts
 
 @bot.listen('on_message')
 async def auto_add_globe_reaction(message):
@@ -522,7 +532,7 @@ async def auto_add_globe_reaction(message):
         return
     if message.content.startswith(bot.command_prefix):
         return
-    if not get_translatable_text(message):
+    if not get_translatable_texts(message):
         return
     try:
         await message.add_reaction(GLOBUS_EMOJI)
@@ -555,11 +565,11 @@ async def _handle_globe_reaction_payload(payload: discord.RawReactionActionEvent
     if user.bot:
         return
 
-    original_text = get_translatable_text(message)
-    if not original_text or not original_text.strip():
+    original_texts = get_translatable_texts(message)
+    if not original_texts:
         return
 
-    view = LanguageSelectView(original_text, message.author.display_name)
+    view = LanguageSelectView(original_texts, message.author.display_name)
     try:
         await user.send("🌐 Choose the language you want this message translated to:", view=view)
     except discord.Forbidden:
@@ -610,14 +620,10 @@ async def help_command(ctx):
 
 @bot.event
 async def on_ready():
-    print(f'[startup-debug] on_ready fired — bot user: {bot.user}')
     print(f'Success! The bot is online as {bot.user.name}')
-    print('[startup-debug] about to call load_stronghold_season_data()')
     await load_stronghold_season_data()
-    print('[startup-debug] load_stronghold_season_data() finished')
     if not check_stronghold_reminder.is_running():
         check_stronghold_reminder.start()
-    print('[startup-debug] on_ready complete')
 
 @bot.event
 async def on_command_error(ctx, error):
