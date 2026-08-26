@@ -561,10 +561,14 @@ async def help_command(ctx):
 
 @bot.event
 async def on_ready():
+    print(f'[startup-debug] on_ready fired — bot user: {bot.user}')
     print(f'Success! The bot is online as {bot.user.name}')
+    print('[startup-debug] about to call load_stronghold_season_data()')
     await load_stronghold_season_data()
+    print('[startup-debug] load_stronghold_season_data() finished')
     if not check_stronghold_reminder.is_running():
         check_stronghold_reminder.start()
+    print('[startup-debug] on_ready complete')
 
 @bot.event
 async def on_command_error(ctx, error):
