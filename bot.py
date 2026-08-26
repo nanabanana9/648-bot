@@ -50,8 +50,9 @@ async def jsonbin_read(bin_id, standard):
         return standard
     url = f"https://api.jsonbin.io/v3/b/{bin_id}/latest"
     headers = {"X-Master-Key": JSONBIN_API_KEY}
+    timeout = aiohttp.ClientTimeout(total=10)  # fail fast instead of aiohttp's 5-minute default
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.get(url, headers=headers) as response:
                 if response.status != 200:
                     print(f"⚠️ jsonbin.io read failed ({response.status})")
@@ -68,8 +69,9 @@ async def jsonbin_write(bin_id, content):
         return False
     url = f"https://api.jsonbin.io/v3/b/{bin_id}"
     headers = {"X-Master-Key": JSONBIN_API_KEY, "Content-Type": "application/json"}
+    timeout = aiohttp.ClientTimeout(total=10)  # fail fast instead of aiohttp's 5-minute default
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.put(url, headers=headers, json=content) as response:
                 if response.status != 200:
                     print(f"⚠️ jsonbin.io write failed ({response.status})")
