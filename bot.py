@@ -405,18 +405,20 @@ def looks_like_translation_failure(text: str) -> bool:
 async def translate_with_fallback(text: str, target_code: str) -> str:
     try:
         result = GoogleTranslator(source='auto', target=target_code).translate(text)
+        print(f"[translate-debug] GoogleTranslator returned: {result[:200]!r}" if result else "[translate-debug] GoogleTranslator returned empty/None")
         if result and not looks_like_translation_failure(result):
             return result
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[translate-debug] GoogleTranslator raised: {type(e).__name__}: {e}")
 
     mymemory_code = MYMEMORY_CODE_MAP.get(target_code, target_code)
     try:
         result = MyMemoryTranslator(source='en-GB', target=mymemory_code).translate(text)
+        print(f"[translate-debug] MyMemoryTranslator returned: {result[:200]!r}" if result else "[translate-debug] MyMemoryTranslator returned empty/None")
         if result and not looks_like_translation_failure(result):
             return result
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[translate-debug] MyMemoryTranslator raised: {type(e).__name__}: {e}")
 
     raise RuntimeError("Both translation providers failed or returned an error page — try again shortly.")
 
