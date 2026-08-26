@@ -12,8 +12,13 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 
 intents = discord.Intents.default()
 intents.message_content = True
-intents.members = True
-bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
+# NOTE: intents.members is intentionally NOT enabled here — this bot never
+# looks up individual members (unlike the FUX bot, which needs it for
+# birthdaylist/bulkrole). Enabling it makes discord.py automatically download
+# the full member list of every server on startup before firing on_ready,
+# which can take a very long time on a large state-wide server and was
+# observed hanging indefinitely before on_ready ever fired (2026-08-26).
+bot = commands.Bot(command_prefix="!", intents=intents, help_command=None, chunk_guilds_at_startup=False)
 
 # ============================================================
 # ⚠️ FILL THESE IN before deploying — see the comments on each.
