@@ -402,6 +402,31 @@ def looks_like_translation_failure(text: str) -> bool:
         "invalid source language", "invalid target language", "no translation was found",
     ])
 
+def _split_into_chunks(text: str, max_len: int = 480) -> list:
+    """Splits text into pieces no longer than max_len, breaking on line
+    boundaries where possible so words/sentences aren't cut mid-way. Falls
+    back to a hard split only if a single line itself exceeds max_len."""
+    lines = text.split("\n")
+    chunks = []
+    current = ""
+    for line in lines:
+        candidate = f"{current}\n{line}" if current else line
+        if len(candidate) <= max_len:
+            current = candidate
+        else:
+            if current:
+                chunks.append(current)
+            if len(line) <= max_len:
+                current = line
+            else:
+                # A single line is itself too long — hard split it.
+                for i in range(0, len(line), max_len):
+                    chunks.append(line[i:i + max_len])
+                current = ""
+    if current:
+        chunks.append(current)
+    return chunks
+
 async def translate_with_fallback(text: str, target_code: str) -> str:
     try:
         result = GoogleTranslator(source='auto', target=target_code).translate(text)
@@ -411,12 +436,23 @@ async def translate_with_fallback(text: str, target_code: str) -> str:
     except Exception as e:
         print(f"[translate-debug] GoogleTranslator raised: {type(e).__name__}: {e}")
 
+    # MyMemory's API hard-rejects anything over 500 characters (confirmed
+    # 2026-08-26 via a real NotValidLength error) — much stricter than
+    # Google's practical limit. Rather than truncating (which would cut off
+    # long content like a full 8-week schedule mid-sentence), split into
+    # multiple under-limit chunks, translate each, and rejoin.
     mymemory_code = MYMEMORY_CODE_MAP.get(target_code, target_code)
+    chunks = _split_into_chunks(text)
+    translated_chunks = []
     try:
-        result = MyMemoryTranslator(source='en-GB', target=mymemory_code).translate(text)
-        print(f"[translate-debug] MyMemoryTranslator returned: {result[:200]!r}" if result else "[translate-debug] MyMemoryTranslator returned empty/None")
-        if result and not looks_like_translation_failure(result):
-            return result
+        for chunk in chunks:
+            piece = MyMemoryTranslator(source='en-GB', target=mymemory_code).translate(chunk)
+            if not piece or looks_like_translation_failure(piece):
+                raise RuntimeError(f"chunk translation failed: {piece!r}")
+            translated_chunks.append(piece)
+        result = "\n".join(translated_chunks)
+        print(f"[translate-debug] MyMemoryTranslator (chunked, {len(chunks)} pieces) returned: {result[:200]!r}")
+        return result
     except Exception as e:
         print(f"[translate-debug] MyMemoryTranslator raised: {type(e).__name__}: {e}")
 
@@ -459,17 +495,23 @@ class LanguageSelectView(discord.ui.View):
 def get_translatable_text(message) -> str:
     if message.content and message.content.strip():
         return message.content
+    if not message.embeds:
+        return ""
+    # Only the FIRST embed — a message can carry several (e.g. !fullseason
+    # with no argument sends all 5 alliances as separate embeds in one
+    # message), and concatenating all of them produces text far too long to
+    # translate usefully (MyMemory hard-caps at 500 chars) or coherently.
+    embed = message.embeds[0]
     parts = []
-    for embed in message.embeds:
-        if embed.title:
-            parts.append(str(embed.title))
-        if embed.description:
-            parts.append(str(embed.description))
-        for field in embed.fields:
-            if field.name:
-                parts.append(str(field.name))
-            if field.value:
-                parts.append(str(field.value))
+    if embed.title:
+        parts.append(str(embed.title))
+    if embed.description:
+        parts.append(str(embed.description))
+    for field in embed.fields:
+        if field.name:
+            parts.append(str(field.name))
+        if field.value:
+            parts.append(str(field.value))
     return "\n".join(parts)
 
 @bot.listen('on_message')
