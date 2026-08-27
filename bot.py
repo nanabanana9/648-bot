@@ -385,8 +385,6 @@ SPRAK_NAVN = {
     "pl": "Polski", "ro": "Română", "it": "Italiano", "ru": "Русский",
 }
 
-GLOBUS_EMOJI = "🌐"
-
 MYMEMORY_CODE_MAP = {
     "en": "en-GB", "no": "nb-NO", "es": "es-ES", "fr": "fr-FR", "de": "de-DE",
     "tr": "tr-TR", "da": "da-DK", "iw": "he-IL", "pl": "pl-PL", "ro": "ro-RO",
@@ -528,73 +526,23 @@ def get_translatable_texts(message) -> list:
             texts.append(text)
     return texts
 
-@bot.listen('on_message')
-async def auto_add_globe_reaction(message):
-    if message.author.bot and message.author.id != bot.user.id:
-        return
-    if message.guild is None:
-        return
-    if message.content.startswith(bot.command_prefix):
-        return
-    if not get_translatable_texts(message):
-        return
-    try:
-        await message.add_reaction(GLOBUS_EMOJI)
-    except (discord.Forbidden, discord.HTTPException):
-        pass
-
-async def _handle_globe_reaction_payload(payload: discord.RawReactionActionEvent):
-    if payload.user_id == bot.user.id:
-        return
-    if str(payload.emoji) != GLOBUS_EMOJI:
-        return
-
-    channel = bot.get_channel(payload.channel_id)
-    if channel is None:
-        try:
-            channel = await bot.fetch_channel(payload.channel_id)
-        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-            return
-    try:
-        message = await channel.fetch_message(payload.message_id)
-    except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-        return
-
-    user = bot.get_user(payload.user_id)
-    if user is None:
-        try:
-            user = await bot.fetch_user(payload.user_id)
-        except discord.HTTPException:
-            return
-    if user.bot:
-        return
-
+@bot.tree.context_menu(name="Translate")
+async def translate_context_menu(interaction: discord.Interaction, message: discord.Message):
+    """
+    Right-click any message -> Apps -> Translate. Replaces the old
+    auto-reaction-on-every-message approach (removed 2026-08-26 after
+    feedback that the 🌐 reaction on every single message was cluttered/
+    annoying on a busy server) — this only triggers when someone actually
+    wants a translation, with no visible reaction added anywhere and no DM
+    needed either (the picker + result both show as ephemeral, visible only
+    to the person who used the command).
+    """
     original_texts = get_translatable_texts(message)
     if not original_texts:
+        await interaction.response.send_message("❌ Nothing to translate in that message.", ephemeral=True)
         return
-
     view = LanguageSelectView(original_texts, message.author.display_name)
-    try:
-        await user.send("🌐 Choose the language you want this message translated to:", view=view)
-    except discord.Forbidden:
-        try:
-            await message.reply(
-                content=f"{user.mention} please enable DMs from server members to use the translator.",
-                mention_author=False,
-            )
-        except Exception:
-            pass
-
-@bot.event
-async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
-    await _handle_globe_reaction_payload(payload)
-
-@bot.event
-async def on_raw_reaction_remove(payload: discord.RawReactionActionEvent):
-    # Tapping an emoji you've already reacted with REMOVES it instead of
-    # adding it (Discord UI behavior) — handling this event too means a
-    # second tap on the same message still works instead of doing nothing.
-    await _handle_globe_reaction_payload(payload)
+    await interaction.response.send_message("🌐 Choose the language you want this message translated to:", view=view, ephemeral=True)
 
 # ---------- Help ----------
 
@@ -625,6 +573,7 @@ async def help_command(ctx):
 @bot.event
 async def on_ready():
     print(f'Success! The bot is online as {bot.user.name}')
+    await bot.tree.sync()
     await load_stronghold_season_data()
     if not check_stronghold_reminder.is_running():
         check_stronghold_reminder.start()
