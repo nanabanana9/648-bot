@@ -125,26 +125,28 @@ SLOT_STRONGHOLD_SCHEDULE = [
 
 # Rewards by Fort/Stronghold NUMBER — unchanged from the FUX bot, since
 # rewards are tied to the number, not to which alliance holds it.
+# NOTE (2026-09-26): "Eleonora shards" and "Lloyd shards" both simplified to
+# just "shards" per user request.
 FORTRESS_REWARDS = {
-    1:  ["Eleonora shards", "Health Buff", "General speedup", "Advanced teleports", "Common wild mark", "Health Buff", "General speedup", "Hero gear XP"],
-    2:  ["Advanced teleports", "Eleonora shards", "Health Buff", "Hero gear XP", "Hero gear XP", "Common wild mark", "Health Buff", "General speedup"],
-    3:  ["General speedup", "Advanced teleports", "Eleonora shards", "Health Buff", "General speedup", "Hero gear XP", "Common wild mark", "Health Buff"],
+    1:  ["shards", "Health Buff", "General speedup", "Advanced teleports", "Common wild mark", "Health Buff", "General speedup", "Hero gear XP"],
+    2:  ["Advanced teleports", "shards", "Health Buff", "Hero gear XP", "Hero gear XP", "Common wild mark", "Health Buff", "General speedup"],
+    3:  ["General speedup", "Advanced teleports", "shards", "Health Buff", "General speedup", "Hero gear XP", "Common wild mark", "Health Buff"],
     4:  ["Health Buff", "General speedup", "Advanced teleports", "Common wild mark", "Advanced teleports", "General speedup", "Hero gear XP", "Common wild mark"],
-    5:  ["Eleonora shards", "Lethality buff", "General speedup", "Hero gear XP", "Common wild mark", "Lethality buff", "General speedup", "Hero gear XP"],
-    6:  ["Advanced teleports", "Eleonora shards", "Lethality buff", "General speedup", "Hero gear XP", "Common wild mark", "Lethality buff", "General speedup"],
-    7:  ["General speedup", "Advanced teleports", "Eleonora shards", "Advanced teleports", "General speedup", "Hero gear XP", "Common wild mark", "Lethality buff"],
+    5:  ["shards", "Lethality buff", "General speedup", "Hero gear XP", "Common wild mark", "Lethality buff", "General speedup", "Hero gear XP"],
+    6:  ["Advanced teleports", "shards", "Lethality buff", "General speedup", "Hero gear XP", "Common wild mark", "Lethality buff", "General speedup"],
+    7:  ["General speedup", "Advanced teleports", "shards", "Advanced teleports", "General speedup", "Hero gear XP", "Common wild mark", "Lethality buff"],
     8:  ["Lethality buff", "General speedup", "Advanced teleports", "Common wild mark", "Advanced teleports", "General speedup", "Hero gear XP", "Common wild mark"],
-    9:  ["Eleonora shards", "Deployment buff", "General speedup", "Hero gear XP", "Common wild mark", "Deployment buff", "General speedup", "Hero gear XP"],
-    10: ["Advanced teleports", "Eleonora shards", "Deployment buff", "Lethality buff", "Hero gear XP", "Common wild mark", "Deployment buff", "General speedup"],
-    11: ["General speedup", "Advanced teleports", "Eleonora shards", "Common wild mark", "General speedup", "Hero gear XP", "Common wild mark", "Deployment buff"],
+    9:  ["shards", "Deployment buff", "General speedup", "Hero gear XP", "Common wild mark", "Deployment buff", "General speedup", "Hero gear XP"],
+    10: ["Advanced teleports", "shards", "Deployment buff", "Lethality buff", "Hero gear XP", "Common wild mark", "Deployment buff", "General speedup"],
+    11: ["General speedup", "Advanced teleports", "shards", "Common wild mark", "General speedup", "Hero gear XP", "Common wild mark", "Deployment buff"],
     12: ["Deployment buff", "General speedup", "Advanced teleports", "General speedup", "Advanced teleports", "General speedup", "Hero gear XP", "Common wild mark"],
 }
 
 STRONGHOLD_REWARDS = {
-    1: ["Lloyd shards", "Pet chest", "Hero gear chest", "Lloyd shards", "Lloyd shards", "Pet chest", "Hero gear chest", "Lloyd shards"],
-    2: ["Fire crystal", "Lloyd shards", "Pet chest", "Fire crystal", "Fire crystal", "Lloyd shards", "Pet chest", "Fire crystal"],
-    3: ["Hero gear chest", "Fire crystal", "Lloyd shards", "Pet chest", "Hero gear chest", "Fire crystal", "Fire crystal", "Pet chest"],
-    4: ["Pet chest", "Hero gear chest", "Fire crystal", "Lloyd shards", "Pet chest", "Hero gear chest", "Lloyd shards", "Lloyd shards"],
+    1: ["shards", "Pet chest", "Hero gear chest", "shards", "shards", "Pet chest", "Hero gear chest", "shards"],
+    2: ["Fire crystal", "shards", "Pet chest", "Fire crystal", "Fire crystal", "shards", "Pet chest", "Fire crystal"],
+    3: ["Hero gear chest", "Fire crystal", "shards", "Pet chest", "Hero gear chest", "Fire crystal", "Fire crystal", "Pet chest"],
+    4: ["Pet chest", "Hero gear chest", "Fire crystal", "shards", "Pet chest", "Hero gear chest", "shards", "shards"],
 }
 
 # ----- Persist to jsonbin (seed on first run, load overrides after) -----
